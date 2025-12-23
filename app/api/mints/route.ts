@@ -4,15 +4,40 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { getContractData, getMintStatus, formatMintPrice } from "@/lib/blockchain"
 
+// Fallback: Dados do contrato deployado quando banco não está disponível
+const FALLBACK_PROJECTS = [
+  {
+    id: "fallback-1",
+    name: "Cyber Punks Genesis",
+    image: "/cyberpunk-neon-avatar.jpg",
+    description: "First generation of Cyber Punks on Arc Testnet. Experimental NFT collection featuring neon-styled avatars.",
+    contractAddress: process.env.CONTRACT_ADDRESS_1 || "0x177b3E8D4E3a4A2BFd191aaCafdae76E4444fbB2",
+    network: "Arc Testnet",
+  },
+]
+
+async function getProjectsFromDB() {
+  try {
+    return await prisma.mintProject.findMany({
+      orderBy: [{ createdAt: "desc" }],
+    })
+  } catch (error: any) {
+    // Se não tiver DATABASE_URL ou banco não estiver configurado, usar fallback
+    if (error.message?.includes("DATABASE_URL") || error.message?.includes("Environment variable")) {
+      console.log("⚠️  Database not configured, using fallback projects")
+      return FALLBACK_PROJECTS as any[]
+    }
+    throw error
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const requestedStatus = searchParams.get("status") // "live" | "upcoming" | "ended" | null
 
-    // Buscar projetos do banco (metadados off-chain)
-    const dbProjects = await prisma.mintProject.findMany({
-      orderBy: [{ createdAt: "desc" }],
-    })
+    // Buscar projetos do banco (metadados off-chain) ou usar fallback
+    const dbProjects = await getProjectsFromDB()
 
     // Buscar dados on-chain da blockchain para cada projeto
     const mints = await Promise.all(
@@ -45,18 +70,21 @@ export async function GET(request: NextRequest) {
           const price = formatMintPrice(contractData.mintPrice)
 
           // Atualizar cache no banco (async, não bloqueia resposta)
-          prisma.mintProject
-            .update({
-              where: { id: project.id },
-              data: {
-                cachedSupply: Number(contractData.maxSupply),
-                cachedMinted: Number(contractData.totalSupply),
-                cachedPrice: price,
-                cachedStatus: status,
-                lastSyncAt: new Date(),
-              },
-            })
-            .catch(console.error)
+          // Só atualiza se o banco estiver disponível
+          if (project.id !== "fallback-1") {
+            prisma.mintProject
+              .update({
+                where: { id: project.id },
+                data: {
+                  cachedSupply: Number(contractData.maxSupply),
+                  cachedMinted: Number(contractData.totalSupply),
+                  cachedPrice: price,
+                  cachedStatus: status,
+                  lastSyncAt: new Date(),
+                },
+              })
+              .catch(console.error)
+          }
 
           return {
             id: project.id,

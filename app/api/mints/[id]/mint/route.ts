@@ -31,10 +31,30 @@ export async function POST(
       return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
     }
 
-    // Obter projeto de mint
-    const mintProject = await prisma.mintProject.findUnique({
-      where: { id },
-    })
+    // Obter projeto de mint (com fallback se banco não estiver disponível)
+    let mintProject
+    try {
+      mintProject = await prisma.mintProject.findUnique({
+        where: { id },
+      })
+    } catch (error: any) {
+      // Se não tiver DATABASE_URL, usar fallback
+      if (error.message?.includes("DATABASE_URL") || error.message?.includes("Environment variable")) {
+        // Tentar encontrar pelo contractAddress se for fallback-1
+        if (id === "fallback-1" || !id) {
+          const contractAddress = process.env.CONTRACT_ADDRESS_1 || "0x177b3E8D4E3a4A2BFd191aaCafdae76E4444fbB2"
+          mintProject = {
+            id: "fallback-1",
+            contractAddress,
+            name: "Cyber Punks Genesis",
+          } as any
+        } else {
+          return NextResponse.json({ error: "Mint project not found" }, { status: 404 })
+        }
+      } else {
+        throw error
+      }
+    }
 
     if (!mintProject) {
       return NextResponse.json({ error: "Mint project not found" }, { status: 404 })

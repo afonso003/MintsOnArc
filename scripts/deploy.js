@@ -30,10 +30,44 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("📦 Deploying NFTMint contract...");
+  // Verificar saldo da wallet antes de deployar
+  const [deployer] = await hre.ethers.getSigners();
+  const balance = await hre.ethers.provider.getBalance(deployer.address);
+  console.log("💰 Deployer address:", deployer.address);
+  console.log("💰 Balance:", hre.ethers.formatEther(balance), "USDC");
+  
+  if (balance === 0n) {
+    console.error("\n❌ ERROR: Wallet has no balance!");
+    console.log("💡 Get testnet USDC from: https://faucet.circle.com");
+    process.exit(1);
+  }
+
+  console.log("\n📦 Deploying NFTMint contract...");
 
   try {
     const NFTMint = await hre.ethers.getContractFactory("NFTMint");
+    
+    // Obter fee data da rede (EIP-1559)
+    const feeData = await hre.ethers.provider.getFeeData();
+    
+    // Arc Testnet: Taxa base mínima é 160 Gwei
+    // Usar valores mais altos para garantir prioridade
+    const baseFee = feeData.gasPrice || hre.ethers.parseUnits("160", "gwei");
+    const maxFeePerGas = feeData.maxFeePerGas || hre.ethers.parseUnits("300", "gwei");
+    const maxPriorityFeePerGas = feeData.maxPriorityFeePerGas || hre.ethers.parseUnits("50", "gwei");
+    
+    // Garantir valores mínimos conforme documentação Arc
+    const minMaxFee = hre.ethers.parseUnits("200", "gwei"); // Mínimo seguro: 200 gwei
+    const finalMaxFee = maxFeePerGas > minMaxFee ? maxFeePerGas : minMaxFee;
+    const finalPriorityFee = maxPriorityFeePerGas || hre.ethers.parseUnits("50", "gwei");
+    
+    console.log("   📊 Network Fee Data:");
+    console.log("      Base Fee:", hre.ethers.formatUnits(baseFee, "gwei"), "gwei");
+    console.log("      Max Fee Per Gas:", hre.ethers.formatUnits(finalMaxFee, "gwei"), "gwei");
+    console.log("      Max Priority Fee:", hre.ethers.formatUnits(finalPriorityFee, "gwei"), "gwei");
+    console.log("   ✅ Using EIP-1559 (recommended for Arc)");
+    
+    console.log("\n   Sending deployment transaction...");
     const nftMint = await NFTMint.deploy(
       name,
       symbol,
@@ -41,11 +75,38 @@ async function main() {
       mintPrice,
       walletMintLimit,
       startTime,
-      endTime
+      endTime,
+      {
+        maxFeePerGas: finalMaxFee,
+        maxPriorityFeePerGas: finalPriorityFee,
+        // Não usar gasPrice quando usar EIP-1559
+      }
     );
 
+    console.log("   Transaction sent! Hash:", nftMint.deploymentTransaction()?.hash);
+    const txHash = nftMint.deploymentTransaction()?.hash;
     console.log("⏳ Waiting for deployment confirmation...");
-    await nftMint.waitForDeployment();
+    console.log("   This may take 30-120 seconds...");
+    console.log("   View on ArcScan:", `https://testnet.arcscan.app/tx/${txHash}`);
+    console.log("\n💡 Tip: You can check the transaction manually on ArcScan");
+    console.log("   If it takes too long, you can cancel (Ctrl+C) and check later");
+    
+    // Aguardar confirmação com polling manual para dar mais controle
+    try {
+      await nftMint.waitForDeployment();
+    } catch (error) {
+      if (error.message.includes("timeout") || error.message.includes("time")) {
+        console.log("\n⏰ Deployment taking longer than expected...");
+        console.log("📋 Transaction Hash:", txHash);
+        console.log("🔗 Check status manually:", `https://testnet.arcscan.app/tx/${txHash}`);
+        console.log("\n💡 You can:");
+        console.log("   1. Wait and check ArcScan manually");
+        console.log("   2. Get contract address from ArcScan once confirmed");
+        console.log("   3. Or run this script again - it will show the address if already deployed");
+        process.exit(0);
+      }
+      throw error;
+    }
     
     const address = await nftMint.getAddress();
 

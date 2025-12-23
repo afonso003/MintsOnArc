@@ -120,7 +120,9 @@ contract NFTMint is ERC721, Ownable, ReentrancyGuard {
     }
 
     function baseURI() public pure returns (string memory) {
-        return "https://api.mintsonarc.com/metadata/";
+        // Em desenvolvimento, usar localhost. Em produção, usar domínio real
+        // Você pode atualizar isso após deploy ou criar função setBaseURI()
+        return "http://localhost:3000/api/metadata/";
     }
 
     function _toString(uint256 value) internal pure returns (string memory) {

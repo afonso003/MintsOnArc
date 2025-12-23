@@ -45,7 +45,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${spaceGrotesk.variable} ${jetBrainsMono.variable} font-sans antialiased`}>
+      <body 
+        className={`${spaceGrotesk.variable} ${jetBrainsMono.variable} font-sans antialiased`}
+        suppressHydrationWarning
+      >
         <Providers>
           {children}
           <Analytics />

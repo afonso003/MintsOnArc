@@ -269,17 +269,6 @@ export function MintModal({ mint, walletState, onClose }: MintModalProps) {
               )}
             </Button>
 
-            {/* Dev button for error simulation */}
-            {showDevButton && mint.status === "live" && walletState === "connected" && (
-              <Button
-                onClick={simulateError}
-                variant="outline"
-                className="w-full text-sm text-white/75 border-red-500/30 hover:bg-red-500/10 bg-transparent"
-              >
-                [Dev] Simulate Error
-              </Button>
-            )}
-
             <p className="text-center text-sm text-white/60">Testnet mint. No real value.</p>
           </div>
         </div>

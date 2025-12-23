@@ -140,3 +140,45 @@ export async function GET(request, { params }) {
 - **API**: Serve o JSON quando solicitado
 
 A blockchain não armazena imagens (seria muito caro). Ela apenas referencia onde encontrar a metadata!
+
+## ✅ Sobre as Imagens
+
+**SIM, as mesmas imagens do mockup são usadas!**
+
+- ✅ Imagens estão em `public/` (ex: `/cyberpunk-neon-avatar.jpg`)
+- ✅ API de metadata retorna essas mesmas imagens
+- ✅ Todos os NFTs de um projeto usam a mesma imagem do projeto
+- ✅ Em produção, você pode ter imagens individuais por tokenId
+
+A API `/api/metadata/[tokenId]` foi criada e usa as imagens de `public/`.
+
+## ⚠️ Se o Deploy Travar
+
+Se o script travar em "Waiting for deployment confirmation...":
+
+### Opção 1: Aguardar
+- Normalmente leva 30-120 segundos
+- Acompanhe no ArcScan (link é mostrado)
+
+### Opção 2: Verificar Manualmente
+Se cancelar (Ctrl+C), você pode verificar depois:
+
+```bash
+node scripts/get-contract-address.js <txHash>
+```
+
+Exemplo:
+```bash
+node scripts/get-contract-address.js 0x5b90feb39d79541f8a37857e6c1ff9760f2e65bc313703457ef16c4293296665
+```
+
+Este script vai:
+- ✅ Verificar se a transação foi confirmada
+- ✅ Mostrar o endereço do contrato quando pronto
+- ✅ Dar instruções para registrar no banco
+
+### Troubleshooting
+
+1. **Transação não encontrada no ArcScan**: Normal, pode levar alguns minutos para indexar
+2. **Saldo insuficiente**: Obtenha USDC em https://faucet.circle.com
+3. **Timeout**: Use o script `get-contract-address.js` para verificar depois

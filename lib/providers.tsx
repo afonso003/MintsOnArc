@@ -30,6 +30,7 @@ const arcTestnet = defineChain({
 })
 
 // Configuração do RainbowKit com Wagmi
+// Criar config e queryClient fora do componente para evitar múltiplas inicializações
 const config = getDefaultConfig({
   appName: "MintsOnArc",
   projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "YOUR_PROJECT_ID",
@@ -37,12 +38,29 @@ const config = getDefaultConfig({
   ssr: true,
 })
 
-const queryClient = new QueryClient()
+// QueryClient singleton para evitar múltiplas instâncias
+let queryClient: QueryClient | undefined = undefined
+
+function getQueryClient() {
+  if (!queryClient) {
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          staleTime: 60 * 1000, // 1 minuto
+        },
+      },
+    })
+  }
+  return queryClient
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  // Usar useMemo para garantir que só cria uma vez
+  const client = React.useMemo(() => getQueryClient(), [])
+  
   return (
     <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
+      <QueryClientProvider client={client}>
         <RainbowKitProvider>{children}</RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
