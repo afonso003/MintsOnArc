@@ -6,7 +6,7 @@ import { getMints } from "@/lib/api"
 import type { MintProject, WalletState } from "@/lib/types"
 
 interface MintGridProps {
-  activeTab: "active" | "upcoming" | "ended"
+  activeTab: "active" | "ended"
   walletState: WalletState
   onMintClick: (mint: MintProject) => void
 }
@@ -32,12 +32,14 @@ export function MintGrid({ activeTab, walletState, onMintClick }: MintGridProps)
 
   const filteredMints = mints.filter((mint) => {
     if (activeTab === "active") return mint.status === "live"
-    if (activeTab === "upcoming") return mint.status === "upcoming"
     if (activeTab === "ended") return mint.status === "ended"
     return false
   })
 
-  const title = activeTab === "active" ? "Active Mints" : activeTab === "upcoming" ? "Upcoming Mints" : "Ended Mints"
+  const title = activeTab === "active" ? "Active Mints" : "Ended Mints"
+  
+  // Centralizar quando há apenas 1 mint ativo
+  const isSingleActiveMint = activeTab === "active" && filteredMints.length === 1
 
   return (
     <section className="py-16 bg-[var(--bg2)]">
@@ -56,7 +58,11 @@ export function MintGrid({ activeTab, walletState, onMintClick }: MintGridProps)
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className={`grid grid-cols-1 gap-6 ${
+            isSingleActiveMint 
+              ? "md:grid-cols-1 max-w-md mx-auto" 
+              : "md:grid-cols-2 lg:grid-cols-3"
+          }`}>
             {filteredMints.map((mint) => (
               <MintCard key={mint.id} mint={mint} onClick={() => onMintClick(mint)} />
             ))}

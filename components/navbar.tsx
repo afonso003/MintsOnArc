@@ -6,8 +6,8 @@ import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { useWallet } from "@/lib/use-wallet"
 
 interface NavbarProps {
-  activeTab: "active" | "upcoming" | "ended"
-  onTabChange: (tab: "active" | "upcoming" | "ended") => void
+  activeTab: "active" | "ended"
+  onTabChange: (tab: "active" | "ended") => void
 }
 
 export function Navbar({ activeTab, onTabChange }: NavbarProps) {
@@ -36,16 +36,6 @@ export function Navbar({ activeTab, onTabChange }: NavbarProps) {
               Active Mints
             </button>
             <button
-              onClick={() => onTabChange("upcoming")}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                activeTab === "upcoming"
-                  ? "bg-[var(--accent-primary)] text-[var(--bg)]"
-                  : "text-[var(--muted)] hover:text-[var(--text)]"
-              }`}
-            >
-              Upcoming
-            </button>
-            <button
               onClick={() => onTabChange("ended")}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                 activeTab === "ended"
@@ -61,11 +51,10 @@ export function Navbar({ activeTab, onTabChange }: NavbarProps) {
           <div className="flex md:hidden items-center gap-2">
             <select
               value={activeTab}
-              onChange={(e) => onTabChange(e.target.value as "active" | "upcoming" | "ended")}
+              onChange={(e) => onTabChange(e.target.value as "active" | "ended")}
               className="bg-[var(--surface)] text-[var(--text)] px-3 py-2 rounded-lg text-sm font-medium border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-secondary)]"
             >
               <option value="active">Active</option>
-              <option value="upcoming">Upcoming</option>
               <option value="ended">Ended</option>
             </select>
           </div>

@@ -2,9 +2,9 @@ import { ExternalLink } from "lucide-react"
 
 export function Footer() {
   const links = [
-    { label: "Docs", href: "#" },
-    { label: "Faucet", href: "#" },
-    { label: "Explorer", href: "#" },
+    { label: "Docs", href: "https://docs.arc.network/arc/concepts/welcome-to-arc" },
+    { label: "Faucet", href: "https://faucet.circle.com" },
+    { label: "Explorer", href: "https://testnet.arcscan.app" },
   ]
 
   return (

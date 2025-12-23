@@ -10,7 +10,7 @@ import { useWallet } from "@/lib/use-wallet"
 import type { MintProject } from "@/lib/types"
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<"active" | "upcoming" | "ended">("active")
+  const [activeTab, setActiveTab] = useState<"active" | "ended">("active")
   const [selectedMint, setSelectedMint] = useState<MintProject | null>(null)
   const { isConnected } = useWallet()
 
