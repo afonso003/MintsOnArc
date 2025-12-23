@@ -4,19 +4,41 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { StatusBadge } from "@/components/status-badge"
-import { X, Clock, Users, AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
+import { X, Clock, Users, AlertCircle, CheckCircle2, Loader2, ExternalLink } from "lucide-react"
+import { useWallet } from "@/lib/use-wallet"
+import { useConnectModal } from "@rainbow-me/rainbowkit"
+import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from "wagmi"
+import { parseEther } from "viem"
+import { NFTMINT_ABI } from "@/lib/contract-abi"
 import type { MintProject, WalletState } from "@/lib/types"
 
 interface MintModalProps {
   mint: MintProject
   walletState: WalletState
   onClose: () => void
-  onConnectWallet: () => void
 }
 
-export function MintModal({ mint, walletState, onClose, onConnectWallet }: MintModalProps) {
+export function MintModal({ mint, walletState, onClose }: MintModalProps) {
+  const { openConnectModal } = useConnectModal()
+  const { connectWallet, address, isCorrectChain, switchToArcTestnet } = useWallet()
   const [mintState, setMintState] = useState<"idle" | "pending" | "confirmed" | "error">("idle")
-  const [showDevButton, setShowDevButton] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string>("")
+
+  // Ler preço do contrato
+  const { data: mintPrice } = useReadContract({
+    address: mint.contractAddress as `0x${string}`,
+    abi: NFTMINT_ABI,
+    functionName: "mintPrice",
+    enabled: !!mint.contractAddress,
+  })
+
+  // Escrever contrato (mint)
+  const { writeContract, data: hash, isPending, error } = useWriteContract()
+
+  // Aguardar confirmação da transação
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  })
 
   // Close modal on escape key
   useEffect(() => {
@@ -27,29 +49,61 @@ export function MintModal({ mint, walletState, onClose, onConnectWallet }: MintM
     return () => window.removeEventListener("keydown", handleEscape)
   }, [onClose])
 
-  const handleMint = () => {
-    if (walletState !== "connected") {
-      onConnectWallet()
+  // Atualizar estado baseado na transação
+  useEffect(() => {
+    if (isPending) {
+      setMintState("pending")
+    } else if (isConfirming) {
+      setMintState("pending")
+    } else if (isConfirmed) {
+      setMintState("confirmed")
+      // Fechar modal após 3 segundos
+      setTimeout(() => {
+        onClose()
+      }, 3000)
+    } else if (error) {
+      setMintState("error")
+      setErrorMessage(error.message || "Transaction failed")
+    }
+  }, [isPending, isConfirming, isConfirmed, error, onClose])
+
+  const handleMint = async () => {
+    if (walletState !== "connected" || !address) {
+      if (openConnectModal) {
+        openConnectModal()
+      } else {
+        connectWallet()
+      }
       return
     }
 
-    setMintState("pending")
+    if (!isCorrectChain) {
+      await switchToArcTestnet()
+      return
+    }
 
-    // Simulate mint transaction
-    setTimeout(() => {
-      setMintState("confirmed")
-      // Reset after 3 seconds
-      setTimeout(() => {
-        setMintState("idle")
-      }, 3000)
-    }, 2000)
-  }
+    if (!mint.contractAddress) {
+      setMintState("error")
+      setErrorMessage("Contract address not configured")
+      return
+    }
 
-  const simulateError = () => {
-    setMintState("error")
-    setTimeout(() => {
-      setMintState("idle")
-    }, 3000)
+    try {
+      setMintState("pending")
+      setErrorMessage("")
+
+      // Fazer mint real na blockchain
+      await writeContract({
+        address: mint.contractAddress as `0x${string}`,
+        abi: NFTMINT_ABI,
+        functionName: "safeMint",
+        args: [address],
+        value: mintPrice || parseEther("0"), // Usar preço do contrato ou 0
+      })
+    } catch (err: any) {
+      setMintState("error")
+      setErrorMessage(err.message || "Failed to mint NFT")
+    }
   }
 
   const progress = (mint.minted / mint.supply) * 100
@@ -150,7 +204,18 @@ export function MintModal({ mint, walletState, onClose, onConnectWallet }: MintM
               <CheckCircle2 className="w-5 h-5 text-[var(--accent-tertiary)] flex-shrink-0" />
               <div>
                 <div className="font-semibold text-[var(--accent-tertiary)]">Mint Successful!</div>
-                <div className="text-sm text-white/75">Your NFT has been minted on testnet</div>
+                <div className="text-sm text-white/75">Your NFT has been minted on Arc Testnet</div>
+                {hash && (
+                  <a
+                    href={`https://testnet.arcscan.app/tx/${hash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[var(--accent-secondary)] hover:underline flex items-center gap-1 mt-1"
+                  >
+                    View transaction
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
               </div>
             </div>
           )}
@@ -160,7 +225,9 @@ export function MintModal({ mint, walletState, onClose, onConnectWallet }: MintM
               <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
               <div>
                 <div className="font-semibold text-red-400">Mint Failed</div>
-                <div className="text-sm text-white/75">Transaction was rejected or failed</div>
+                <div className="text-sm text-white/75">
+                  {errorMessage || "Transaction was rejected or failed"}
+                </div>
               </div>
             </div>
           )}
@@ -169,21 +236,30 @@ export function MintModal({ mint, walletState, onClose, onConnectWallet }: MintM
           <div className="space-y-3">
             <Button
               onClick={handleMint}
-              disabled={mint.status !== "live" || mintState === "pending"}
-              onDoubleClick={() => setShowDevButton(true)}
+              disabled={
+                mint.status !== "live" ||
+                mintState === "pending" ||
+                isPending ||
+                isConfirming ||
+                !mint.contractAddress
+              }
               className={`w-full h-14 text-lg font-bold ${
-                mint.status === "live" && walletState === "connected"
+                mint.status === "live" && walletState === "connected" && mint.contractAddress
                   ? "bg-gradient-to-r from-[var(--accent-primary)] to-[#FFB347] hover:opacity-90 text-white"
                   : "bg-[var(--bg2)] text-[var(--muted)] cursor-not-allowed"
               }`}
             >
-              {mintState === "pending" ? (
+              {mintState === "pending" || isPending || isConfirming ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Minting...
+                  {isConfirming ? "Confirming..." : "Minting..."}
                 </span>
+              ) : !mint.contractAddress ? (
+                "Contract Not Deployed"
               ) : walletState !== "connected" ? (
                 "Connect Wallet to Mint"
+              ) : !isCorrectChain ? (
+                "Switch to Arc Testnet"
               ) : mint.status === "upcoming" ? (
                 "Coming Soon"
               ) : mint.status === "ended" ? (

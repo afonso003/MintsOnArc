@@ -1,0 +1,81 @@
+// Prisma Schema para MintsOnArc Backend
+// Database: PostgreSQL
+// 
+// NOTA: Este banco é usado APENAS para cache e metadados off-chain.
+// A blockchain Arc é a fonte de verdade para dados on-chain (supply, minted, ownership, etc.)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Projetos de Mint (NFT Collections)
+// Metadados off-chain apenas - dados on-chain vêm da blockchain
+model MintProject {
+  id              String   @id @default(cuid())
+  name            String
+  image           String
+  description     String   @db.Text
+  contractAddress String   @unique // Endereço do contrato NFT na blockchain (OBRIGATÓRIO)
+  network         String   @default("Arc Testnet")
+  
+  // Cache de dados on-chain (atualizado periodicamente)
+  // A fonte de verdade está na blockchain
+  cachedSupply    Int?     // Cache de maxSupply do contrato
+  cachedMinted    Int?     // Cache de totalSupply do contrato
+  cachedPrice     String?  // Cache de mintPrice do contrato
+  cachedStatus    String?  // Cache de status calculado
+  
+  // Metadados administrativos (não estão na blockchain)
+  // Estes podem ser usados para override ou configuração adicional
+  adminStatus     String?  // Override manual de status (opcional)
+  adminStartTime  DateTime? // Override manual de startTime (opcional)
+  adminEndTime    DateTime? // Override manual de endTime (opcional)
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  lastSyncAt      DateTime? // Última vez que dados foram sincronizados da blockchain
+
+  // Relações
+  transactions    MintTransaction[]
+
+  @@index([contractAddress])
+  @@index([cachedStatus])
+}
+
+// Transações de Mint
+// Log local apenas - dados reais estão na blockchain
+model MintTransaction {
+  id            String   @id @default(cuid())
+  mintProjectId String
+  walletAddress String
+  txHash        String   @unique // Hash da transação na blockchain (fonte de verdade)
+  tokenId       String?  // ID do NFT mintado (da blockchain)
+  status        String   // "pending" | "confirmed" | "failed" (cache local)
+  blockNumber   String?  // Número do bloco (da blockchain) - String para suportar bigint
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relação
+  mintProject MintProject @relation(fields: [mintProjectId], references: [id], onDelete: Cascade)
+
+  @@index([walletAddress])
+  @@index([mintProjectId])
+  @@index([txHash])
+  @@index([status])
+}
+
+// Configurações do sistema
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+

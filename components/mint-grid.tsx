@@ -1,7 +1,8 @@
 "use client"
 
-import { mockMints } from "@/lib/mock-data"
+import { useEffect, useState } from "react"
 import { MintCard } from "@/components/mint-card"
+import { getMints } from "@/lib/api"
 import type { MintProject, WalletState } from "@/lib/types"
 
 interface MintGridProps {
@@ -11,7 +12,25 @@ interface MintGridProps {
 }
 
 export function MintGrid({ activeTab, walletState, onMintClick }: MintGridProps) {
-  const filteredMints = mockMints.filter((mint) => {
+  const [mints, setMints] = useState<MintProject[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchMints() {
+      try {
+        setLoading(true)
+        const allMints = await getMints()
+        setMints(allMints)
+      } catch (error) {
+        console.error("Error fetching mints:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchMints()
+  }, [])
+
+  const filteredMints = mints.filter((mint) => {
     if (activeTab === "active") return mint.status === "live"
     if (activeTab === "upcoming") return mint.status === "upcoming"
     if (activeTab === "ended") return mint.status === "ended"
@@ -25,9 +44,16 @@ export function MintGrid({ activeTab, walletState, onMintClick }: MintGridProps)
       <div className="container mx-auto px-4">
         <h2 className="text-3xl md:text-4xl font-bold mb-8 text-center">{title}</h2>
 
-        {filteredMints.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-20">
+            <p className="text-[var(--muted)] text-lg">Loading mints from blockchain...</p>
+          </div>
+        ) : filteredMints.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-[var(--muted)] text-lg">No mints found in this category.</p>
+            <p className="text-[var(--muted)] text-sm mt-2">
+              Deploy a contract and register it in the database to see it here.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

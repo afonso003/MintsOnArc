@@ -2,16 +2,16 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import type { WalletState } from "@/lib/types"
+import { ConnectButton } from "@rainbow-me/rainbowkit"
+import { useWallet } from "@/lib/use-wallet"
 
 interface NavbarProps {
   activeTab: "active" | "upcoming" | "ended"
   onTabChange: (tab: "active" | "upcoming" | "ended") => void
-  walletState: WalletState
-  onConnectWallet: () => void
 }
 
-export function Navbar({ activeTab, onTabChange, walletState, onConnectWallet }: NavbarProps) {
+export function Navbar({ activeTab, onTabChange }: NavbarProps) {
+  const { isConnected, isCorrectChain, switchToArcTestnet } = useWallet()
   return (
     <nav className="sticky top-0 z-50 bg-[var(--bg)]/80 backdrop-blur-xl border-b border-[var(--border)]">
       <div className="container mx-auto px-4 py-4">
@@ -78,13 +78,55 @@ export function Navbar({ activeTab, onTabChange, walletState, onConnectWallet }:
             >
               Arc Testnet
             </Badge>
-            <Button
-              onClick={onConnectWallet}
-              disabled={walletState === "connected"}
-              className="bg-gradient-to-r from-[var(--accent-secondary)] to-[var(--accent-tertiary)] text-[var(--bg)] font-semibold hover:opacity-90 transition-opacity"
-            >
-              {walletState === "connected" ? "Connected" : "Connect Wallet"}
-            </Button>
+            {isConnected && !isCorrectChain && (
+              <Button
+                onClick={switchToArcTestnet}
+                className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/30"
+              >
+                Switch to Arc Testnet
+              </Button>
+            )}
+            <ConnectButton.Custom>
+              {({ account, chain, openConnectModal, mounted }) => {
+                const ready = mounted
+                const connected = ready && account && chain
+
+                return (
+                  <div
+                    {...(!ready && {
+                      "aria-hidden": true,
+                      style: {
+                        opacity: 0,
+                        pointerEvents: "none",
+                        userSelect: "none",
+                      },
+                    })}
+                  >
+                    {(() => {
+                      if (!connected) {
+                        return (
+                          <Button
+                            onClick={openConnectModal}
+                            className="bg-gradient-to-r from-[var(--accent-secondary)] to-[var(--accent-tertiary)] text-[var(--bg)] font-semibold hover:opacity-90 transition-opacity"
+                          >
+                            Connect Wallet
+                          </Button>
+                        )
+                      }
+
+                      return (
+                        <Button
+                          disabled
+                          className="bg-gradient-to-r from-[var(--accent-secondary)] to-[var(--accent-tertiary)] text-[var(--bg)] font-semibold opacity-75"
+                        >
+                          {account.displayName}
+                        </Button>
+                      )
+                    })()}
+                  </div>
+                )
+              }}
+            </ConnectButton.Custom>
           </div>
         </div>
       </div>
